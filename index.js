@@ -8,38 +8,7 @@ const port = 3000;
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(express.static("public"));
 
-function createChartData(groupedData){
-
-    //create keys (queue_names or categories) from dataset
-    var queueKeys = Object.keys(groupedData);
-        var categoryChartData = [];
-        var categoryChartDataSum = [];
-        
-        queueKeys.forEach((category) =>{
-
-            var subCategories = Object.keys(groupedData[category]);
-            subCategories.forEach((subcategory)=>{
-                var x = groupedData[category][subcategory].length;
-                categoryChartData.push(x);
-            });
-            
-            //
-            const sum = categoryChartData.reduce((acc, current) => acc + current,0);
-            categoryChartDataSum.push(sum);
-        });
-        
-
-    const chartData = {
-        labels: queueKeys,
-        datasets:[{
-            label: "311 Calls - Categories",
-            data : categoryChartDataSum,
-        }]
-    };
-    return chartData;
-}
-
-app.get("/", async(req,res)=>{
+function getDateFilter(){
 
     const date = new Date();
     date.setDate(date.getDate() - 13); // Last 14 days including today
@@ -49,22 +18,15 @@ app.get("/", async(req,res)=>{
     const day = String(date.getDate()).padStart(2, '0');
     const formattedDatetime = `${year}-${month}-${day} 00:00:00`;  // start of day
 
-    try{
+    return formattedDatetime;
+}
 
-        var url = "https://services2.arcgis.com/11XBiaBYA9Ep0yNJ/arcgis/rest/services/311_Call_Details/FeatureServer/0/query";
-        const result = await axios.get(url, { 
-            params: {
-                where: `ARRIVAL_DATETIME >= DATE '${formattedDatetime}'`,
-                outFields: "*",
-                outSR: 4326,
-                f: "json"
-            }
-        });
+function transformData(data){
 
         //DATA TRANSFORMATION TO GROUP BY QUEUE_NAME AND THEN WRAPUP_NAME
 
         //removes "features" on the dataset and creates one with all attributes as keys
-        const resultCalls = result.data.features.map(feature => feature.attributes);
+        const resultCalls = data.map(feature => feature.attributes);
         
         //group by QUEUE_NAME and then WRAPUP_NAME- using reduce()
         const groupedResult = resultCalls.reduce((groupedRecords, call) => {
@@ -113,21 +75,125 @@ app.get("/", async(req,res)=>{
 
         }, {});
 
-        //CREATING INITIAL CHART DATA - CALL COUNT BY CATEGORY
+        return groupedResult;
+}
+
+function createCategoryChartData(groupedData){
+
+    //create keys (queue_names or categories) from dataset
+    var queueKeys = Object.keys(groupedData);
+        var categoryChartData = [];
+        var categoryChartDataSum = [];
         
+        queueKeys.forEach((category) =>{
+
+            var subCategories = Object.keys(groupedData[category]);
+            subCategories.forEach((subcategory)=>{
+                var x = groupedData[category][subcategory].length;
+                categoryChartData.push(x);
+            });
+            
+            //
+            const sum = categoryChartData.reduce((acc, current) => acc + current,0);
+            categoryChartDataSum.push(sum);
+        });
+        
+
+    const chartData = {
+        labels: queueKeys,
+        datasets:[{
+            label: "311 Calls - Categories",
+            data : categoryChartDataSum,
+        }]
+    };
+    return chartData;
+}
+
+function createSubCategoryChartData(groupedData){
+
+    //create keys (wrapup_names or subcategories) from dataset
+    var queueKeys = Object.keys(groupedData);
+        var subCategoryChartData = [];
+        
+        queueKeys.forEach((category) =>{
+                var x = groupedData[category].length;
+                subCategoryChartData.push(x);
+            });
+            
+            const chartData = {
+                labels: queueKeys,
+                datasets:[{
+                    label: "311 Calls - Categories",
+                    data : subCategoryChartData,
+                }]
+            };
+            return chartData;
+            
+    }
+
+async function get311Data(){
+
+    try{
+    var formattedDatetime = getDateFilter();
+    var url = "https://services2.arcgis.com/11XBiaBYA9Ep0yNJ/arcgis/rest/services/311_Call_Details/FeatureServer/0/query";
+    const result = await axios.get(url, { 
+        params: {
+            where: `ARRIVAL_DATETIME >= DATE '${formattedDatetime}'`,
+            outFields: "*",
+            outSR: 4326,
+            f: "json"
+        }
+    });
+
+    const groupedResult = transformData(result.data.features);
+    return groupedResult;
+    }
+    catch(error){
+         console.log(error.message);
+        res.send(501);
+    }
+
+}
+
+app.get("/", async (req,res)=> {
+
+    try{
+        const groupedResult = await get311Data();
+
+        //CREATING INITIAL CHART DATA - CALL COUNT BY CATEGORY;
+
         res.render("index.ejs",{
             content: groupedResult,
-            dataChart : createChartData(groupedResult),
+            dataChart : createCategoryChartData(groupedResult)
         });
     }
     catch(error){
         console.log(error.message);
         res.send(501);
-    };
+    }
 });
 
+
 app.post("/submit", async(req,res)=>{
-    console.log(req.body);
+
+    try{
+        //get transformed 311 data
+        const groupedResult = await get311Data();
+        const selectedChartCategory = groupedResult[req.body.queueName];
+
+        //CREATING SELECTED CHART DATA - CALL COUNT BY SUBCATEGORY;
+
+        res.render("index.ejs",{
+            content: groupedResult,
+            dataChart : createSubCategoryChartData(selectedChartCategory)
+        });
+    }
+    catch(error){
+        console.log(error.message);
+        res.send(501);
+    }
+
+
 });
 
 app.listen(port);
