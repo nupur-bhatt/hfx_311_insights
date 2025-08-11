@@ -1,0 +1,32 @@
+
+.chart-container {  
+  margin: 0 auto; 
+}
+
+.modal-content {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.modal-body{
+  width: 95%;
+  height: 100%;
+}
+
+.plot-container .chart-container .parent-container{
+  height: 100vh; 
+}
+
+.svg-container {
+  height: 100% ; 
+}
+
+.rowStyle{
+  min-height: 80vh;
+}
+
+#fullscreenChart #chartPlotly {
+  height : 100%;
+}

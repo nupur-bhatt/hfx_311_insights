@@ -78,6 +78,38 @@ function transformData(data){
         return groupedResult;
 }
 
+// function createCategoryChartData(groupedData){
+
+//     //create keys (queue_names or categories) from dataset
+//     var queueKeys = Object.keys(groupedData);
+//         var categoryChartData = [];
+//         var categoryChartDataSum = [];
+        
+//         queueKeys.forEach((category) =>{
+
+//             var subCategories = Object.keys(groupedData[category]);
+//             subCategories.forEach((subcategory)=>{
+//                 var x = groupedData[category][subcategory].length;
+//                 categoryChartData.push(x);
+//             });
+            
+//             //
+//             const sum = categoryChartData.reduce((acc, current) => acc + current,0);
+//             categoryChartDataSum.push(sum);
+//         });
+        
+
+//     const chartData = {
+//         labels: queueKeys,
+//         datasets:[{
+//             label: "311 Calls - Categories",
+//             data : categoryChartDataSum,
+//         }],
+//         options: { responsive: true, maintainAspectRatio: false }
+//     };
+//     return chartData;
+// }
+
 function createCategoryChartData(groupedData){
 
     //create keys (queue_names or categories) from dataset
@@ -92,20 +124,17 @@ function createCategoryChartData(groupedData){
                 var x = groupedData[category][subcategory].length;
                 categoryChartData.push(x);
             });
-            
-            //
+
             const sum = categoryChartData.reduce((acc, current) => acc + current,0);
             categoryChartDataSum.push(sum);
         });
         
 
-    const chartData = {
+    const chartData = [{
         labels: queueKeys,
-        datasets:[{
-            label: "311 Calls - Categories",
-            data : categoryChartDataSum,
-        }]
-    };
+        values : categoryChartDataSum,
+        type: 'pie'
+    }];
     return chartData;
 }
 
@@ -119,17 +148,37 @@ function createSubCategoryChartData(groupedData){
                 var x = groupedData[category].length;
                 subCategoryChartData.push(x);
             });
-            
-            const chartData = {
+            // var labelChart = "311 Calls"
+            const chartData = [{
                 labels: queueKeys,
-                datasets:[{
-                    label: "311 Calls - Categories",
-                    data : subCategoryChartData,
-                }]
-            };
+                values: subCategoryChartData,
+                type : 'pie'
+            }];
             return chartData;
             
     }
+
+// function createSubCategoryChartData(groupedData){
+
+//     //create keys (wrapup_names or subcategories) from dataset
+//     var queueKeys = Object.keys(groupedData);
+//         var subCategoryChartData = [];
+        
+//         queueKeys.forEach((category) =>{
+//                 var x = groupedData[category].length;
+//                 subCategoryChartData.push(x);
+//             });
+//             var labelChart = "311 Calls"
+//             const chartData = {
+//                 labels: queueKeys,
+//                 datasets:[{
+//                     label: labelChart,
+//                     data : subCategoryChartData,
+//                 }]
+//             };
+//             return chartData;
+            
+//     }
 
 async function get311Data(){
 
@@ -164,7 +213,8 @@ app.get("/", async (req,res)=> {
 
         res.render("index.ejs",{
             content: groupedResult,
-            dataChart : createCategoryChartData(groupedResult)
+            dataChart : createCategoryChartData(groupedResult),
+            selectedQueue: null,
         });
     }
     catch(error){
@@ -173,8 +223,15 @@ app.get("/", async (req,res)=> {
     }
 });
 
+app.get('/submit', (req, res) => {
+
+  res.redirect('/'); 
+});
+
 
 app.post("/submit", async(req,res)=>{
+
+    const queueName = req.body.queueName;
 
     try{
         //get transformed 311 data
@@ -185,7 +242,9 @@ app.post("/submit", async(req,res)=>{
 
         res.render("index.ejs",{
             content: groupedResult,
-            dataChart : createSubCategoryChartData(selectedChartCategory)
+            dataChart : createSubCategoryChartData(selectedChartCategory),
+            selectedQueue: queueName,
+            isChartCategory : false
         });
     }
     catch(error){
